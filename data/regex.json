@@ -1,0 +1,22 @@
+[
+  {
+    "desc": "IPv4 Address (0.0.0.0 to 255.255.255.255)",
+    "pattern": "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
+  },
+  {
+    "desc": "Email Address (simple validation)",
+    "pattern": "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+  },
+  {
+    "desc": "ISO 8601 Date Format (YYYY-MM-DD)",
+    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+  },
+  {
+    "desc": "Git SHA Commit Hash (Hexadecimal 7-40 chars)",
+    "pattern": "\\b[0-9a-f]{7,40}\\b"
+  },
+  {
+    "desc": "Markdown file with index (e.g., 001-TITLE-SUB.md)",
+    "pattern": "^\\d{3}-[A-Z]+(?:-[A-Z]+)*\\.md$"
+  }
+]

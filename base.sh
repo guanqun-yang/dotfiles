@@ -27,19 +27,25 @@ list_cmds() {
             }
             
             # Match standard function definition: func() {
+            # Skip helper functions starting with _
             /^[a-zA-Z0-9_-]+\(\) *\{/ {
                 cmd = $1
                 sub(/\(\).*/, "", cmd)
-                printf "%-20s %-25s %s\n", fname, cmd, doc
+                if (cmd !~ /^_/) {
+                    printf "%-20s %-25s %s\n", fname, cmd, doc
+                }
                 doc = ""
                 next
             }
-            
+
             # Match bash function definition: function func { or function func() {
+            # Skip helper functions starting with _
             /^function [a-zA-Z0-9_-]+/ {
                 cmd = $2
                 sub(/\(\)/, "", cmd) # Remove () if present
-                printf "%-20s %-25s %s\n", fname, cmd, doc
+                if (cmd !~ /^_/) {
+                    printf "%-20s %-25s %s\n", fname, cmd, doc
+                }
                 doc = ""
                 next
             }
