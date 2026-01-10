@@ -1,0 +1,14 @@
+[
+  {
+    "desc": "Lab server",
+    "cmd": "ssh gyang16@155.246.81.65"
+  },
+  {
+    "desc": "School server",
+    "cmd": "ssh gyang16@jarvis.stevens.edu"
+  },
+  {
+    "desc": "Home server",
+    "cmd": "ssh yang@192.168.1.254"
+  }
+]

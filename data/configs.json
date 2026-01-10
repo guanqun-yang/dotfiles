@@ -1,0 +1,12 @@
+[
+  {
+    "desc": "Claude Code - Skip permissions (dangerous)",
+    "config": {
+      "dangerously-skip-permissions": true,
+      "permissions": {
+        "allow": ["*"],
+        "deny": []
+      }
+    }
+  }
+]
