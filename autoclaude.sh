@@ -107,16 +107,14 @@ FAQ
        Use 'autoclaude --list-tmux' to see all running sessions.
 
 BILLING
-    IMPORTANT: This tool uses the Anthropic API, NOT your Claude subscription.
+    This tool automatically unsets ANTHROPIC_API_KEY to prevent API billing.
+    It will either use your Claude subscription (Pro/Max/Team/Enterprise) or
+    fail with an authentication error if no subscription is configured.
 
-    - Interactive 'claude': Can use your Claude subscription (Pro/Max/Team/Enterprise)
-    - Headless 'claude -p' (this tool): Always bills to Anthropic API (pay-per-token)
+    If you WANT to use API billing, set AUTOCLAUDE_ALLOW_API_BILLING=true.
 
-    Both modes use the same Claude Code CLI and respect the same settings hierarchy:
-    ~/.claude/settings.json, <project>/.claude/settings.json, ANTHROPIC_MODEL, etc.
-
-    Autonomous sessions can make many API calls, so costs can add up quickly.
-    Use --max-turns to limit spending on runaway tasks.
+    Autonomous sessions can consume many tokens quickly.
+    Use --max-turns to limit token consumption.
 
 NOTES
     - Requires: tmux, claude (Claude Code CLI), jq (optional, for session IDs)
@@ -204,7 +202,8 @@ _autoclaude_check_command() {
         echo ""
         echo "$install_hint"
         echo ""
-        read -p "Would you like to install '$cmd' now? [y/N] " -n 1 -r
+        echo -n "Would you like to install '$cmd' now? [y/N] "
+        read -r REPLY
         echo ""
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             return 1
@@ -327,7 +326,8 @@ _autoclaude_check_dependencies() {
     # Check jq (optional but recommended)
     if ! command -v jq &> /dev/null; then
         _autoclaude_log_warn "'jq' is not installed. It's recommended for parsing JSON output."
-        read -p "Would you like to install 'jq'? [y/N] " -n 1 -r
+        echo -n "Would you like to install 'jq'? [y/N] "
+        read -r REPLY
         echo ""
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             _autoclaude_install_jq
@@ -374,23 +374,6 @@ _autoclaude_start_session() {
     fi
 
     echo ""
-    echo -e "${_AUTOCLAUDE_RED}╔════════════════════════════════════════════════════════════════════╗${_AUTOCLAUDE_NC}"
-    echo -e "${_AUTOCLAUDE_RED}║                        ⚠️  BILLING WARNING ⚠️                        ║${_AUTOCLAUDE_NC}"
-    echo -e "${_AUTOCLAUDE_RED}╠════════════════════════════════════════════════════════════════════╣${_AUTOCLAUDE_NC}"
-    echo -e "${_AUTOCLAUDE_RED}║  This tool uses the ANTHROPIC API (pay-per-token).                ║${_AUTOCLAUDE_NC}"
-    echo -e "${_AUTOCLAUDE_RED}║  It does NOT use your Claude subscription (Pro/Max/Team).         ║${_AUTOCLAUDE_NC}"
-    echo -e "${_AUTOCLAUDE_RED}║                                                                    ║${_AUTOCLAUDE_NC}"
-    echo -e "${_AUTOCLAUDE_RED}║  Autonomous sessions can make MANY API calls.                     ║${_AUTOCLAUDE_NC}"
-    echo -e "${_AUTOCLAUDE_RED}║  Use --max-turns to limit costs. Run 'autoclaude-help' for info.  ║${_AUTOCLAUDE_NC}"
-    echo -e "${_AUTOCLAUDE_RED}╚════════════════════════════════════════════════════════════════════╝${_AUTOCLAUDE_NC}"
-    echo ""
-    read -p "Do you understand and want to proceed? [y/N] " -n 1 -r
-    echo ""
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        _autoclaude_log_info "Aborted."
-        return 0
-    fi
-    echo ""
     _autoclaude_log_info "Starting Claude Code autonomous session..."
     echo "  Session:  $_AUTOCLAUDE_SESSION_NAME"
     echo "  Output:   $json_output"
@@ -411,7 +394,8 @@ _autoclaude_start_session() {
     # Kill existing session if it exists
     if tmux has-session -t "$_AUTOCLAUDE_SESSION_NAME" 2>/dev/null; then
         _autoclaude_log_warn "Session '$_AUTOCLAUDE_SESSION_NAME' already exists."
-        read -p "Kill existing session and start new one? [y/N] " -n 1 -r
+        echo -n "Kill existing session and start new one? [y/N] "
+        read -r REPLY
         echo ""
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             tmux kill-session -t "$_AUTOCLAUDE_SESSION_NAME"
@@ -444,6 +428,11 @@ _autoclaude_start_session() {
 #!/bin/bash
 cd "$working_dir"
 
+# Unset API key to prevent API billing unless explicitly allowed
+if [[ "\${AUTOCLAUDE_ALLOW_API_BILLING:-false}" != "true" ]]; then
+    unset ANTHROPIC_API_KEY
+fi
+
 INSTRUCTION="\$(cat "$instruction_tmp")"
 
 claude -p "\$INSTRUCTION" \\
@@ -453,22 +442,26 @@ claude -p "\$INSTRUCTION" \\
     $skip_perm_arg \\
     --verbose \\
     --output-format stream-json \\
-    > "$json_output" 2>&1
+    2>&1 | tee "$json_output"
 
-exit_code=\$?
+exit_code=\${PIPESTATUS[0]}
 echo ""
 echo "════════════════════════════════════════"
 echo "Claude Code finished with exit code: \$exit_code"
 echo "Output saved to: $json_output"
 echo "════════════════════════════════════════"
+echo "Press Enter to close this session..."
+read
 
 rm -f "$instruction_tmp"
 SCRIPT
 
     chmod +x "$tmp_script"
 
-    # Start new tmux session
-    tmux new-session -d -s "$_AUTOCLAUDE_SESSION_NAME" "bash '$tmp_script'"
+    # Start new tmux session with remain-on-exit so it stays open
+    tmux new-session -d -s "$_AUTOCLAUDE_SESSION_NAME"
+    tmux set-option -t "$_AUTOCLAUDE_SESSION_NAME" remain-on-exit on
+    tmux send-keys -t "$_AUTOCLAUDE_SESSION_NAME" "bash '$tmp_script'" Enter
 
     _autoclaude_log_success "Session started!"
     echo ""
@@ -660,7 +653,8 @@ _autoclaude_resume_session() {
     # Kill existing tmux session if it exists
     if tmux has-session -t "$_AUTOCLAUDE_SESSION_NAME" 2>/dev/null; then
         _autoclaude_log_warn "Session '$_AUTOCLAUDE_SESSION_NAME' already exists."
-        read -p "Kill existing session and start resume? [y/N] " -n 1 -r
+        echo -n "Kill existing session and start resume? [y/N] "
+        read -r REPLY
         echo ""
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             tmux kill-session -t "$_AUTOCLAUDE_SESSION_NAME"
@@ -693,6 +687,11 @@ _autoclaude_resume_session() {
 #!/bin/bash
 cd "$working_dir"
 
+# Unset API key to prevent API billing unless explicitly allowed
+if [[ "\${AUTOCLAUDE_ALLOW_API_BILLING:-false}" != "true" ]]; then
+    unset ANTHROPIC_API_KEY
+fi
+
 INSTRUCTION="\$(cat "$instruction_tmp")"
 
 claude --resume "$session_id" -p "\$INSTRUCTION" \\
@@ -702,14 +701,16 @@ claude --resume "$session_id" -p "\$INSTRUCTION" \\
     $skip_perm_arg \\
     --verbose \\
     --output-format stream-json \\
-    > "$json_output" 2>&1
+    2>&1 | tee "$json_output"
 
-exit_code=\$?
+exit_code=\${PIPESTATUS[0]}
 echo ""
 echo "════════════════════════════════════════"
 echo "Claude Code finished with exit code: \$exit_code"
 echo "Output saved to: $json_output"
 echo "════════════════════════════════════════"
+echo "Press Enter to close this session..."
+read
 
 rm -f "$instruction_tmp"
 SCRIPT
@@ -718,14 +719,24 @@ SCRIPT
 #!/bin/bash
 cd "$working_dir"
 
+# Unset API key to prevent API billing unless explicitly allowed
+if [[ "\${AUTOCLAUDE_ALLOW_API_BILLING:-false}" != "true" ]]; then
+    unset ANTHROPIC_API_KEY
+fi
+
 claude --resume "$session_id"
+echo ""
+echo "Press Enter to close this session..."
+read
 SCRIPT
     fi
 
     chmod +x "$tmp_script"
 
-    # Start tmux session
-    tmux new-session -d -s "$_AUTOCLAUDE_SESSION_NAME" "bash '$tmp_script'"
+    # Start tmux session with remain-on-exit so it stays open
+    tmux new-session -d -s "$_AUTOCLAUDE_SESSION_NAME"
+    tmux set-option -t "$_AUTOCLAUDE_SESSION_NAME" remain-on-exit on
+    tmux send-keys -t "$_AUTOCLAUDE_SESSION_NAME" "bash '$tmp_script'" Enter
 
     _autoclaude_log_success "Resume session started!"
     echo ""
