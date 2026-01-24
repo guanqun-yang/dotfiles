@@ -53,15 +53,16 @@ latex() {
   echo "Starting LaTeX compilation of $input_file..."
 
   # First pass
-  echo "[1/4] Running pdflatex (first pass)..."
-  if ! pdflatex -interaction=nonstopmode -file-line-error "$input_file" > /dev/null 2>&1; then
-    echo "First pdflatex pass failed. Check $base_name.log for details."
+  echo "[1/5] Running pdflatex (first pass)..."
+  pdflatex -interaction=nonstopmode -file-line-error "$input_file" > /dev/null 2>&1
+  if [[ ! -f "$base_name.pdf" ]]; then
+    echo "First pdflatex pass failed - no PDF generated. Check $base_name.log for details."
     return 1
   fi
 
   # Bibliography pass - detect biber (biblatex) vs bibtex
   if [[ -f "$base_name.bcf" ]]; then
-    echo "[2/4] Running biber (biblatex detected)..."
+    echo "[2/5] Running biber (biblatex detected)..."
     if command -v biber &> /dev/null; then
       biber "$base_name" > /dev/null 2>&1 || echo "Note: biber had some issues (this may be normal if no citations)."
     else
@@ -70,27 +71,62 @@ latex() {
       biber "$base_name" > /dev/null 2>&1
     fi
   else
-    echo "[2/4] Running bibtex..."
+    echo "[2/5] Running bibtex..."
     bibtex "$base_name" > /dev/null 2>&1 || echo "Note: bibtex had some issues (this may be normal if no citations)."
   fi
 
   # Second pass
-  echo "[3/4] Running pdflatex (second pass)..."
-  if ! pdflatex -interaction=nonstopmode -file-line-error "$input_file" > /dev/null 2>&1; then
-    echo "Second pdflatex pass failed. Check $base_name.log for details."
-    return 1
-  fi
+  echo "[3/5] Running pdflatex (second pass)..."
+  pdflatex -interaction=nonstopmode -file-line-error "$input_file" > /dev/null 2>&1
 
   # Third pass
-  echo "[4/4] Running pdflatex (third pass)..."
-  if ! pdflatex -interaction=nonstopmode -file-line-error "$input_file" > /dev/null 2>&1; then
-    echo "Third pdflatex pass failed. Check $base_name.log for details."
+  echo "[4/5] Running pdflatex (third pass)..."
+  pdflatex -interaction=nonstopmode -file-line-error "$input_file" > /dev/null 2>&1
+
+  # Check final PDF exists
+  if [[ ! -f "$base_name.pdf" ]]; then
+    echo "Compilation failed - no PDF generated. Check $base_name.log for details."
     return 1
   fi
 
   # Copy to timestamped output
   local output_name="${timestamp}_${base_name}.pdf"
   cp "$base_name.pdf" "$output_name"
+
+  # Strip metadata
+  echo "[5/5] Stripping PDF metadata..."
+  if command -v exiftool &> /dev/null; then
+    exiftool -all= -overwrite_original "$output_name" > /dev/null 2>&1
+  elif command -v qpdf &> /dev/null; then
+    qpdf --linearize --replace-input "$output_name" > /dev/null 2>&1
+  else
+    echo "Neither exiftool nor qpdf found for metadata stripping."
+    local install_cmd=""
+    if command -v brew &> /dev/null; then
+      install_cmd="brew install exiftool"
+    elif command -v apt-get &> /dev/null; then
+      install_cmd="sudo apt-get install -y libimage-exiftool-perl"
+    elif command -v pacman &> /dev/null; then
+      install_cmd="sudo pacman -S perl-image-exiftool"
+    fi
+
+    if [[ -n "$install_cmd" ]]; then
+      echo "To install exiftool, run: $install_cmd"
+      read -p "Do you want to install exiftool now? (y/N) " -n 1 -r
+      echo ""
+      if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "Running: $install_cmd"
+        eval "$install_cmd"
+        if command -v exiftool &> /dev/null; then
+          exiftool -all= -overwrite_original "$output_name" > /dev/null 2>&1
+        fi
+      else
+        echo "Skipping metadata stripping."
+      fi
+    else
+      echo "Could not detect a supported package manager. Skipping metadata stripping."
+    fi
+  fi
 
   echo "Compilation successful!"
   echo "Output: $output_name"
