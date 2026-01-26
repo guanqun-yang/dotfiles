@@ -136,6 +136,15 @@ latex() {
     local pages=$(pdfinfo "$output_name" 2>/dev/null | grep "Pages:" | awk '{print $2}')
     [[ -n "$pages" ]] && echo "Pages: $pages"
   fi
+
+  # Open PDF with system default viewer
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    open "$output_name"
+  elif command -v xdg-open &> /dev/null; then
+    xdg-open "$output_name" &> /dev/null &
+  else
+    echo "Note: Could not detect a PDF viewer to open the file automatically."
+  fi
 }
 
 # Clean LaTeX auxiliary files for .tex files in directory: latexclean [directory]

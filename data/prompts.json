@@ -1,0 +1,26 @@
+[
+  {
+    "desc": "Code Review Request",
+    "prompt": "Please review the following code for bugs, performance issues, and best practices. Suggest improvements where applicable."
+  },
+  {
+    "desc": "Explain Code",
+    "prompt": "Please explain what this code does step by step, including its purpose and how each part works."
+  },
+  {
+    "desc": "Write Unit Tests",
+    "prompt": "Please write comprehensive unit tests for the following code, covering edge cases and common scenarios."
+  },
+  {
+    "desc": "Refactor for Readability",
+    "prompt": "Please refactor this code to improve readability and maintainability while preserving its functionality."
+  },
+  {
+    "desc": "Debug This Error",
+    "prompt": "I'm encountering the following error. Please help me understand the root cause and suggest a fix."
+  },
+  {
+    "desc": "Explain Paper",
+    "prompt": "You are a helpful assistant that answers questions about a PDF document. Here is the content of the PDF document.\n\nPlease answer questions based on this document. If the answer cannot be found in the document, say so clearly.\n\nWhen you try to prove a point. Use the citation format to quote the verbatim of the original text:\n\n> This is the verbatim."
+  }
+]
